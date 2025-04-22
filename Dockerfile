@@ -11,6 +11,7 @@ COPY app/ /srv/shiny-server
 
 WORKDIR /srv/shiny-server/
 
-RUN Rscript -e "shinylive::export(appdir = '.', destdir = 'docs')" \
-    && chown --recursive shiny:shiny /srv/shiny-server/
+RUN chown --recursive shiny:shiny /srv/shiny-server/
 
+# WASM Build
+# RUN Rscript -e "shinylive::export(appdir = '.', destdir = 'docs')"

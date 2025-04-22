@@ -13,30 +13,27 @@ library(htmltools)
 library(ggpubr)
 library(factoextra)
 library(tidyr)
+library(duckdb)
 #library(lessR)
 #library(plotly)
 
-
+# load duckdb database (from createdb.R)
+drv <- duckdb::duckdb(dbdir = 'data.duckdb')
+con <- duckdb::dbConnect(drv)
 
 ###load spruce
-spruce<-readRDS('spruce.final.RDS')
-
-spruce$HbBV_C13_gain<-spruce$HbBV_C13_gain*-1
-spruce$AbBV_C13_gain<-spruce$AbBV_C13_gain*-1
-
-spruce$Site<-factor(spruce$Site)
-spruce$ID<-as.character(spruce$ID)
-spruce$Family<-as.character(spruce$Family)
+spruce_colnames <- dbGetQuery(con, "DESCRIBE spruce")$column_name
+spruce <- dbGetQuery(con, "SELECT * FROM spruce")
 
 spruce.bv.index<-c(29,31,33,35,37)
 spruce.bv.nice.names<-c("DBH30","HT30","WD","RES2015","C13")
-spruce.bv.names<-colnames(spruce)[spruce.bv.index]
+spruce.bv.names<-spruce_colnames[spruce.bv.index]
 
 spruce.A.bv.index<-spruce.bv.index+10
-spruce.A.bv.names<-colnames(spruce)[spruce.A.bv.index]
+spruce.A.bv.names<-spruce_colnames[spruce.A.bv.index]
 
 spruce.phen.index<-c(15,18,21,23,25)
-spruce.phen.names<-colnames(spruce)[spruce.phen.index]
+spruce.phen.names<-spruce_colnames[spruce.phen.index]
 
 spruce.gen.gain.index<-c(49:53)
 spruce.ped.gain.index<-c(54:58)
@@ -45,35 +42,25 @@ spruce.bv.names
 spruce.A.bv.names
 spruce.phen.names
 spruce.bv.nice.names
-colnames(spruce[spruce.gen.gain.index])
-colnames(spruce[spruce.ped.gain.index])
+spruce_colnames[spruce.gen.gain.index]
+spruce_colnames[spruce.ped.gain.index]
 ###
 
-
-
 ###load pine###
-pine<-readRDS('pine.final.RDS')
-
-pine$BV_G.C13b.s_gain<-pine$BV_G.C13b.s_gain*-1
-pine$BV_A.C13b.s_gain<-pine$BV_A.C13b.s_gain*-1
-#pine$Hs8.BV_HT30_gain<-pine$Hs8.BV_HT30_gain+1
-#pine$Hs8.BV_DBH30_gain<-pine$Hs8.BV_DBH30_gain+1
-
-pine$Site<-factor(pine$Site)
-pine$ID<-as.character(pine$ID)
-pine$Family<-as.character(pine$Family)
+pine_colnames <- dbGetQuery(con, "DESCRIBE pine")$column_name
+pine <- dbGetQuery(con, "SELECT * FROM pine")
 
 pine.bv.index<-c(31,33,35,37,39,41,43,45)
-colnames(pine)[pine.bv.index]
+pine_colnames[pine.bv.index]
 
 pine.bv.nice.names<-c("DBH30","HT30","WGR36","WD","MFA","DECL","C13","MPB")
-pine.bv.names<-colnames(pine)[pine.bv.index]
+pine.bv.names<-pine_colnames[pine.bv.index]
 
 pine.A.bv.index<-pine.bv.index+16
-pine.A.bv.names<-colnames(pine)[pine.A.bv.index]
+pine.A.bv.names<-pine_colnames[pine.A.bv.index]
 
 pine.phen.index<-c(21:28)
-pine.phen.names<-colnames(pine)[pine.phen.index]
+pine.phen.names<-pine_colnames[pine.phen.index]
 
 pine.gen.gain.index<-c(63:70)
 pine.ped.gain.index<-c(71:78)
@@ -82,20 +69,20 @@ pine.bv.names
 pine.A.bv.names
 pine.phen.names
 pine.bv.nice.names
-colnames(pine[pine.gen.gain.index])
-colnames(pine[pine.ped.gain.index])
+pine_colnames[pine.gen.gain.index]
+pine_colnames[pine.ped.gain.index]
 
 
 ###
 #env
-
-soilGRIDS.data <- readRDS('soilGRIDS.data.RDS')
-clim.data <- readRDS('clim.data.long.RDS')
+soilGRIDS.data <- dbGetQuery(con, "SELECT * FROM soilGRIDS")
+clim.data <- dbGetQuery(con, "SELECT * FROM climate")
 
 
 ##for legacy##
-pine.msmt<-readRDS('pine.MSMT.wide.bvs.RDS')
-spruce.msmt<-readRDS('pine.MSMT.wide.bvs.RDS')
+pine.msmt <- dbGetQuery(con, "SELECT * FROM pine_msmt")
+# TBD: Check if this was intentional to load same file as pine and spruce
+spruce.msmt <- dbGetQuery(con, "SELECT * FROM pine_msmt")
 ##
 
 
@@ -152,12 +139,12 @@ ui<-fluidPage(
                           conditionalPanel(
                             'input.dataset === "Lodgepole Pine"',
                             checkboxGroupInput("show_vars1", "Columns to show:",
-                                               names(pine)[1:28], selected = names(pine)[c(1,3,5)])
+                                               pine_colnames[1:28], selected = pine_colnames[c(1,3,5)])
                           ),
                           conditionalPanel(
                             'input.dataset === "White Spruce"',
                             checkboxGroupInput("show_vars2", "Columns to show:",
-                                               names(spruce)[c(1:15,18,21,23,25)], selected = names(spruce)[c(1,3,6)])
+                                               spruce_colnames[c(1:15,18,21,23,25)], selected = spruce_colnames[c(1,3,6)])
                           )
                         ),
                         mainPanel(
@@ -838,7 +825,7 @@ server<-function(input, output, session) {
   output$mymap <- renderLeaflet({
     
     leaflet() %>%
-      addProviderTiles(providers$Stamen.Terrain,#OpenTopoMap,#Stamen.TonerLite,
+      addProviderTiles(providers$Stadia.StamenTerrain,#OpenTopoMap,#Stamen.TonerLite,
                        options = providerTileOptions(noWrap = TRUE)
       ) %>%
       setView(-114.6, 55.3, zoom = 7) %>%
@@ -856,13 +843,13 @@ server<-function(input, output, session) {
   output$mytable1 <- renderDataTable(
     datatable(pine[,input$show_vars1, drop = T],
               filter = "top",
-              options = list(orderClasses = TRUE, autoWidth = TRUE, columnDefs = list(list(width = '10px'))))
+              options = list(orderClasses = TRUE, autoWidth = TRUE, columnDefs = list(list(width = '10px', targets = '_all'))))
   )
   
   output$mytable2 <- renderDataTable(
     datatable(spruce[,input$show_vars2, drop = T],  
               filter = "top",
-              options = list(orderClasses = TRUE, autoWidth = TRUE, columnDefs = list(list(width = '10px'))))
+              options = list(orderClasses = TRUE, autoWidth = TRUE, columnDefs = list(list(width = '10px', targets = '_all'))))
   )
   
   ##
@@ -1010,11 +997,11 @@ server<-function(input, output, session) {
   #   # UI component and send it to the client.
   #   switch(input$input_type,
   #          "White Spruce" = checkboxGroupInput("dynamic2", "Traits",
-  #                                              choices = colnames(spruce)[c(spruce.phen.index,spruce.bv.index,spruce.A.bv.index,spruce.gen.gain.index,spruce.ped.gain.index)],
+  #                                              choices = spruce_colnames[c(spruce.phen.index,spruce.bv.index,spruce.A.bv.index,spruce.gen.gain.index,spruce.ped.gain.index)],
   #                                              selected = ""),
   #          
   #          "Lodgepole Pine" = checkboxGroupInput("dynamic2", "Traits",
-  #                                                choices = colnames(pine)[c(pine.phen.index,pine.bv.index,pine.A.bv.index,pine.gen.gain.index,pine.ped.gain.index)],
+  #                                                choices = pine_colnames[c(pine.phen.index,pine.bv.index,pine.A.bv.index,pine.gen.gain.index,pine.ped.gain.index)],
   #                                                selected = "")
   #   )
   # })
@@ -1148,11 +1135,11 @@ server<-function(input, output, session) {
     # UI component and send it to the client.
     switch(input$input_type3,
            "White Spruce" = checkboxGroupInput("dynamic6", "Traits",
-                                               choices = colnames(spruce)[c(spruce.phen.index,spruce.bv.index,spruce.A.bv.index,spruce.gen.gain.index,spruce.ped.gain.index)],
+                                               choices = spruce_colnames[c(spruce.phen.index,spruce.bv.index,spruce.A.bv.index,spruce.gen.gain.index,spruce.ped.gain.index)],
                                                selected = ""),
            
            "Lodgepole Pine" = checkboxGroupInput("dynamic6", "Traits",
-                                                 choices = colnames(pine)[c(pine.phen.index,pine.bv.index,pine.A.bv.index,pine.gen.gain.index,pine.ped.gain.index)],
+                                                 choices = pine_colnames[c(pine.phen.index,pine.bv.index,pine.A.bv.index,pine.gen.gain.index,pine.ped.gain.index)],
                                                  selected = "")
     )
   })
@@ -1170,7 +1157,7 @@ server<-function(input, output, session) {
         
         if(input$input_type3=="Lodgepole Pine") data2 <- pine[which(pine$Site%in%input$dynamic5),] 
         
-        #subset(pine, site %in% input$dynamic5 & colnames(pine)%in%input$dynamic6)
+        #subset(pine, site %in% input$dynamic5 & pine_colnames%in%input$dynamic6)
         
         
         return(data2)
@@ -1179,7 +1166,7 @@ server<-function(input, output, session) {
     
     switch(input$input_type3,
            
-           "Lodgepole Pine" = ggplot(df_subset(), aes_string(x = colnames(pine)[which(colnames(pine)%in%input$dynamic6[1])], y = colnames(pine)[which(colnames(pine)%in%input$dynamic6[2])], color='Site')) + geom_point() + labs(fill="Site",x= input$dynamic6[1],y=input$dynamic6[2]) + scale_colour_manual(values=c("blue", "purple", "orange", "green")),
+           "Lodgepole Pine" = ggplot(df_subset(), aes_string(x = pine_colnames[which(pine_colnames%in%input$dynamic6[1])], y = pine_colnames[which(pine_colnames%in%input$dynamic6[2])], color='Site')) + geom_point() + labs(fill="Site",x= input$dynamic6[1],y=input$dynamic6[2]) + scale_colour_manual(values=c("blue", "purple", "orange", "green")),
            
            "White Spruce" =  ggplot(df_subset(), aes_string(x = input$dynamic6[1], y = input$dynamic6[2], color='Site'), aes(color = factor(df_subset()[,'Site']))) + geom_point()+ labs(fill = "Site", x= input$dynamic6[1],y=input$dynamic6[2])
     ) 
@@ -1196,7 +1183,7 @@ server<-function(input, output, session) {
     #a <- pine[which(pine$site%in%input$dynamic5),]
     
     #pine[which(pine$site%in%input$dynamic5),]
-    #subset(pine, site %in% input$dynamic5 & colnames(pine)%in%input$dynamic6)
+    #subset(pine, site %in% input$dynamic5 & pine_colnames%in%input$dynamic6)
     return(a)
   })
   
@@ -1444,8 +1431,8 @@ server<-function(input, output, session) {
     if(input$input_type2=="White Spruce") {
       
       
-      # temp.gen.gain<-spruce[which(spruce$ID%in%temp.gen$ID),c('ID',colnames(spruce)[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(temp.gen))]])]
-      # temp.ped.gain<-spruce[which(spruce$ID%in%temp.ped$ID),c('ID',colnames(spruce)[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(temp.gen))]])]
+      # temp.gen.gain<-spruce[which(spruce$ID%in%temp.gen$ID),c('ID',spruce_colnames[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(temp.gen))]])]
+      # temp.ped.gain<-spruce[which(spruce$ID%in%temp.ped$ID),c('ID',spruce_colnames[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(temp.gen))]])]
       # 
       # df.gain<-data.frame(Analysis=c("Genomic","Pedigree"),stringsAsFactors = F)
       # df.gain<-cbind(df.gain,rbind(colMeans(as.data.frame(temp.gen.gain[,-1])),colMeans(as.data.frame(temp.ped.gain[,-1]))))
@@ -1453,8 +1440,8 @@ server<-function(input, output, session) {
       # colnames(df.gain)[2:ncol(df.gain)]<-spruce.bv.nice.names[which(spruce.bv.names%in%colnames(temp.gen))]
       
       
-      temp.gen.gain<-spruce[which(spruce$ID%in%x5$ID),c('ID',colnames(spruce)[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(x5))]])]
-      temp.ped.gain<-spruce[which(spruce$ID%in%x5$ID),c('ID',colnames(spruce)[spruce.ped.gain.index[which(spruce.bv.names%in%colnames(x5))]])]
+      temp.gen.gain<-spruce[which(spruce$ID%in%x5$ID),c('ID',spruce_colnames[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(x5))]])]
+      temp.ped.gain<-spruce[which(spruce$ID%in%x5$ID),c('ID',spruce_colnames[spruce.ped.gain.index[which(spruce.bv.names%in%colnames(x5))]])]
       df.gain<-data.frame(Analysis=c("Genomic","Pedigree"),stringsAsFactors = F)
       
       
@@ -1467,8 +1454,8 @@ server<-function(input, output, session) {
     
     if(input$input_type2=="Lodgepole Pine") {
       
-      # temp.gen.gain<-pine[which(pine$ID%in%temp.gen$ID),c('ID',colnames(pine)[pine.gen.gain.index[which(pine.bv.names%in%colnames(temp.gen))]])]
-      # temp.ped.gain<-pine[which(pine$ID%in%temp.ped$ID),c('ID',colnames(pine)[pine.gen.gain.index[which(pine.bv.names%in%colnames(temp.gen))]])]
+      # temp.gen.gain<-pine[which(pine$ID%in%temp.gen$ID),c('ID',pine_colnames[pine.gen.gain.index[which(pine.bv.names%in%colnames(temp.gen))]])]
+      # temp.ped.gain<-pine[which(pine$ID%in%temp.ped$ID),c('ID',pine_colnames[pine.gen.gain.index[which(pine.bv.names%in%colnames(temp.gen))]])]
       # 
       # df.gain<-data.frame(Analysis=c("Genomic","Pedigree"),stringsAsFactors = F)
       # df.gain<-cbind(df.gain,rbind(colMeans(as.data.frame(temp.gen.gain[,-1])),colMeans(as.data.frame(temp.ped.gain[,-1]))))
@@ -1476,8 +1463,8 @@ server<-function(input, output, session) {
       # colnames(df.gain)[2:ncol(df.gain)]<-pine.bv.nice.names[which(pine.bv.names%in%colnames(temp.gen))]
       
       
-      temp.gen.gain<-pine[which(pine$ID%in%x5$ID),c('ID',colnames(pine)[pine.gen.gain.index[which(pine.bv.names%in%colnames(x5))]])]
-      temp.ped.gain<-pine[which(pine$ID%in%x5$ID),c('ID',colnames(pine)[pine.ped.gain.index[which(pine.bv.names%in%colnames(x5))]])]
+      temp.gen.gain<-pine[which(pine$ID%in%x5$ID),c('ID',pine_colnames[pine.gen.gain.index[which(pine.bv.names%in%colnames(x5))]])]
+      temp.ped.gain<-pine[which(pine$ID%in%x5$ID),c('ID',pine_colnames[pine.ped.gain.index[which(pine.bv.names%in%colnames(x5))]])]
       
       df.gain<-data.frame(Analysis=c("Genomic","Pedigree"),stringsAsFactors = F)
       
@@ -1547,7 +1534,7 @@ server<-function(input, output, session) {
     if(input$input_type2=="White Spruce") {
       
       
-      temp.gen.gain2<-spruce[which(spruce$ID%in%x4$ID),c('Family','ID',colnames(spruce)[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(x4))]])]
+      temp.gen.gain2<-spruce[which(spruce$ID%in%x4$ID),c('Family','ID',spruce_colnames[spruce.gen.gain.index[which(spruce.bv.names%in%colnames(x4))]])]
       temp.gen.gain2<-temp.gen.gain2[order(match(temp.gen.gain2$ID,x4$ID)),]
       
       colnames(x4)<-c('Family','ID',spruce.bv.nice.names[which(spruce.bv.names%in%colnames(x4))],'Index')   #set friendly names
@@ -1579,7 +1566,7 @@ server<-function(input, output, session) {
     
     if(input$input_type2=="Lodgepole Pine") {
       
-      temp.gen.gain2<-pine[which(pine$ID%in%x4$ID),c('Family','ID',colnames(pine)[pine.gen.gain.index[which(pine.bv.names%in%colnames(x4))]])]
+      temp.gen.gain2<-pine[which(pine$ID%in%x4$ID),c('Family','ID',pine_colnames[pine.gen.gain.index[which(pine.bv.names%in%colnames(x4))]])]
       temp.gen.gain2<-temp.gen.gain2[order(match(temp.gen.gain2$ID,x4$ID)),]
       
       colnames(x4)<-c('Family','ID',pine.bv.nice.names[which(pine.bv.names%in%colnames(x4))],'Index')   #set friendly names
@@ -2410,7 +2397,7 @@ server<-function(input, output, session) {
         #average across all selected sites - genomic
         #regular BV
         trait.temp<-which(pine.bv.nice.names%in%input$traits.backwards)
-        trait.temp<-colnames(pine)[pine.bv.index[trait.temp]]
+        trait.temp<-pine_colnames[pine.bv.index[trait.temp]]
         data.backwards<-pine[which(pine$Site%in%input$sites.backwards),c('ID','Family','Site',trait.temp)] 
         data.backwards<-data.backwards[complete.cases(data.backwards),] #remove NA
         data.backwards<-data.backwards[which(!data.backwards$Family%in%names(which(sort(table(data.backwards$Family))<5))),] #min 5 obs / family
@@ -2421,7 +2408,7 @@ server<-function(input, output, session) {
         print(paste('break 1'))
         
         #genetic gain BV
-        gen.gain.names<-colnames(pine)[pine.gen.gain.index[which(pine.bv.nice.names%in%input$traits.backwards)]]
+        gen.gain.names<-pine_colnames[pine.gen.gain.index[which(pine.bv.nice.names%in%input$traits.backwards)]]
         data.backwards.gen.gain<-pine[which(pine$Site%in%input$sites.backwards),c('ID','Family','Site',gen.gain.names)] 
         data.backwards.gen.gain<-data.backwards.gen.gain[complete.cases(data.backwards.gen.gain),] #remove NA
         data.backwards.gen.gain<-data.backwards.gen.gain[which(!data.backwards.gen.gain$Family%in%names(which(sort(table(data.backwards.gen.gain$Family))<5))),] #min 5 obs / family
@@ -2472,7 +2459,7 @@ server<-function(input, output, session) {
         ###average across all selected sites -pedigree
         #regular bv
         trait.temp2<-which(pine.bv.nice.names%in%input$traits.backwards)
-        trait.temp2<-colnames(pine)[pine.A.bv.index[trait.temp2]]
+        trait.temp2<-pine_colnames[pine.A.bv.index[trait.temp2]]
         data.backwards.A<-pine[which(pine$Site%in%input$sites.backwards),c('ID','Family','Site',trait.temp2)] 
         data.backwards.A<-data.backwards.A[complete.cases(data.backwards.A),] #remove NA
         data.backwards.A<-data.backwards.A[which(!data.backwards.A$Family%in%names(which(sort(table(data.backwards.A$Family))<5))),] #min 5 obs / family
@@ -2483,7 +2470,7 @@ server<-function(input, output, session) {
         print(paste('break 5'))         
         
         #genetic gain bv
-        ped.gain.names<-colnames(pine)[pine.ped.gain.index[which(pine.bv.nice.names%in%input$traits.backwards)]]
+        ped.gain.names<-pine_colnames[pine.ped.gain.index[which(pine.bv.nice.names%in%input$traits.backwards)]]
         data.backwards.ped.gain<-pine[which(pine$Site%in%input$sites.backwards),c('ID','Family','Site',ped.gain.names)] 
         data.backwards.ped.gain<-data.backwards.ped.gain[complete.cases(data.backwards.ped.gain),] #remove NA
         data.backwards.ped.gain<-data.backwards.ped.gain[which(!data.backwards.ped.gain$Family%in%names(which(sort(table(data.backwards.ped.gain$Family))<5))),] #min 5 obs / family
@@ -2530,7 +2517,7 @@ server<-function(input, output, session) {
         #average across all selected sites - genomic
         #regular BV
         trait.temp<-which(spruce.bv.nice.names%in%input$traits.backwards)
-        trait.temp<-colnames(spruce)[spruce.bv.index[trait.temp]]
+        trait.temp<-spruce_colnames[spruce.bv.index[trait.temp]]
         data.backwards<-spruce[which(spruce$Site%in%input$sites.backwards),c('ID','Family','Site',trait.temp)] 
         data.backwards<-data.backwards[complete.cases(data.backwards),] #remove NA
         data.backwards<-data.backwards[which(!data.backwards$Family%in%names(which(sort(table(data.backwards$Family))<5))),] #min 5 obs / family
@@ -2541,7 +2528,7 @@ server<-function(input, output, session) {
         print(paste('break 1'))
         
         #genetic gain BV
-        gen.gain.names<-colnames(spruce)[spruce.gen.gain.index[which(spruce.bv.nice.names%in%input$traits.backwards)]]
+        gen.gain.names<-spruce_colnames[spruce.gen.gain.index[which(spruce.bv.nice.names%in%input$traits.backwards)]]
         data.backwards.gen.gain<-spruce[which(spruce$Site%in%input$sites.backwards),c('ID','Family','Site',gen.gain.names)] 
         data.backwards.gen.gain<-data.backwards.gen.gain[complete.cases(data.backwards.gen.gain),] #remove NA
         data.backwards.gen.gain<-data.backwards.gen.gain[which(!data.backwards.gen.gain$Family%in%names(which(sort(table(data.backwards.gen.gain$Family))<5))),] #min 5 obs / family
@@ -2592,7 +2579,7 @@ server<-function(input, output, session) {
         ###average across all selected sites -pedigree
         #regular bv
         trait.temp2<-which(spruce.bv.nice.names%in%input$traits.backwards)
-        trait.temp2<-colnames(spruce)[spruce.A.bv.index[trait.temp2]]
+        trait.temp2<-spruce_colnames[spruce.A.bv.index[trait.temp2]]
         data.backwards.A<-spruce[which(spruce$Site%in%input$sites.backwards),c('ID','Family','Site',trait.temp2)] 
         data.backwards.A<-data.backwards.A[complete.cases(data.backwards.A),] #remove NA
         data.backwards.A<-data.backwards.A[which(!data.backwards.A$Family%in%names(which(sort(table(data.backwards.A$Family))<5))),] #min 5 obs / family
@@ -2603,7 +2590,7 @@ server<-function(input, output, session) {
         print(paste('break 5'))         
         
         #genetic gain bv
-        ped.gain.names<-colnames(spruce)[spruce.ped.gain.index[which(spruce.bv.nice.names%in%input$traits.backwards)]]
+        ped.gain.names<-spruce_colnames[spruce.ped.gain.index[which(spruce.bv.nice.names%in%input$traits.backwards)]]
         data.backwards.ped.gain<-spruce[which(spruce$Site%in%input$sites.backwards),c('ID','Family','Site',ped.gain.names)] 
         data.backwards.ped.gain<-data.backwards.ped.gain[complete.cases(data.backwards.ped.gain),] #remove NA
         data.backwards.ped.gain<-data.backwards.ped.gain[which(!data.backwards.ped.gain$Family%in%names(which(sort(table(data.backwards.ped.gain$Family))<5))),] #min 5 obs / family

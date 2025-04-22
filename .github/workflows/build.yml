@@ -16,6 +16,9 @@ env:
 jobs:
   image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write 
 
     steps:
       - name: Checkout Repository
@@ -39,15 +42,6 @@ jobs:
           id=$(docker create ${{ env.IMAGE_NAME }})
           docker cp $id:/srv/shiny-server/docs ./site
           docker container rm -v $id
-
-      # Upload artifact for debugging
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: website
-          path: site/
-          retention-days: 1
-          if-no-files-found: error
       
       # Deploy to pages site
       - name: Deploy

@@ -36,25 +36,25 @@ jobs:
           load: true
           tags: ${{ env.IMAGE_NAME }}
 
-      # Extract site from container
-      - name: Extract
-        run: |
-          id=$(docker create ${{ env.IMAGE_NAME }})
-          docker cp $id:/srv/shiny-server/docs ./site
-          docker container rm -v $id
+      # # Extract site from container
+      # - name: Extract
+      #   run: |
+      #     id=$(docker create ${{ env.IMAGE_NAME }})
+      #     docker cp $id:/srv/shiny-server/docs ./site
+      #     docker container rm -v $id
 
-      # Upload artifact for debugging
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: website
-          path: site/
-          retention-days: 1
-          if-no-files-found: error
+      # # Upload artifact for debugging
+      # - name: Upload Artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: website
+      #     path: site/
+      #     retention-days: 1
+      #     if-no-files-found: error
       
-      # Deploy to pages site
-      - name: Deploy
-        uses: JamesIves/github-pages-deploy-action@v4
-        if: github.ref == 'refs/heads/main'
-        with:
-          folder: site
+      # # Deploy to pages site
+      # - name: Deploy
+      #   uses: JamesIves/github-pages-deploy-action@v4
+      #   if: github.ref == 'refs/heads/main'
+      #   with:
+      #     folder: site

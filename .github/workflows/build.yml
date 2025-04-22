@@ -33,17 +33,26 @@ jobs:
           load: true
           tags: ${{ env.IMAGE_NAME }}
 
-      - name: Test
+      # Extract site from container
+      - name: Extract
         run: |
-          docker run --rm --entrypoint bash ${{ env.IMAGE_NAME }} -c "echo test"
+          id=$(docker create --name resfor-shiny ${{ env.IMAGE_NAME }})
+          docker cp $id:/srv/shiny-server/docs ./_site
+          docker container rm -v $id
+      
+      # - name: Deploy
+      #   if: github.ref == 'refs/heads/main'
+      #   run: |
+      #     if: github.ref == 'refs/heads/main'
   
-      # # Upload a tar file that will work with GitHub Pages
-      # # Make sure to set a retention day to avoid running into a cap
-      # # This artifact shouldn't be required after deployment onto pages was a success.
-      # - name: Upload Pages artifact
-      #   uses: actions/upload-pages-artifact@v3
-      #   with: 
-      #     retention-days: 1
+      # Upload a tar file that will work with GitHub Pages
+      # Make sure to set a retention day to avoid running into a cap
+      # This artifact shouldn't be required after deployment onto pages was a success.
+      - name: Upload
+        uses: actions/upload-pages-artifact@v3
+        with: 
+          retention-days: 1
+          path: _site
       
       # # Use an Action deploy to push the artifact onto GitHub Pages
       # # This requires the `Action` tab being structured to allow for deployment
